@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments (install.sh creates /opt/spark-access/venv on the Spark)
+venv/
+.venv/
+env/
+
+# Secrets and local settings: keep env.example, never commit a filled-in env
+.env
+.env.*
+!.env.example
+/spark-access/env
+*.local
+
+# SQLite database (on the Spark it lives in /var/lib/spark-access)
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# Logs
+*.log
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

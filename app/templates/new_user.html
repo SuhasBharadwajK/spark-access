@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card" style="max-width:640px">
+  <h2 style="margin-top:0">Add a person</h2>
+  <p class="muted">Creates their Linux account and SSH key, a LiteLLM key, a Portainer user in the
+     "{{ cfg.PORTAINER_TEAM }}" team, and a Turnstone user with role {{ cfg.TURNSTONE_ROLE }}.</p>
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  <form method="post" action="/users">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="username">Username</label>
+    <input id="username" name="username" value="{{ form.username or '' }}" required pattern="[a-z][a-z0-9_\-]{0,31}">
+    <div class="hint">Lowercase, used everywhere: Linux, LiteLLM key name, Portainer, Turnstone.</div>
+    <label for="display_name">Display name</label>
+    <input id="display_name" name="display_name" value="{{ form.display_name or '' }}" required>
+    <label for="email">Work email (optional)</label>
+    <input id="email" name="email" type="email" value="{{ form.email or '' }}">
+    <div class="hint">Used as their LiteLLM user ID, so usage reports show the email.</div>
+    <label for="public_key">SSH public key</label>
+    <textarea id="public_key" name="public_key" required placeholder="ssh-ed25519 AAAA... ">{{ form.public_key or '' }}</textarea>
+    <div class="hint">From <code>~/.ssh/id_ed25519.pub</code> on their laptop. The comment is replaced with <code>&lt;username&gt;@laptop</code>.</div>
+    <p><button type="submit">Create access</button> <a href="/" style="margin-left:10px">Cancel</a></p>
+  </form>
+</div>
+{% endblock %}

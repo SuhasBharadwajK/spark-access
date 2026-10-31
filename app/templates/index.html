@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+<div class="card">
+  <div class="row" style="justify-content:space-between">
+    <div class="pills">
+      {% for name, state in health.items() %}
+        <span>{{ name }}: <b class="{{ 'ok' if state == 'up' else ('muted' if state == 'not configured' else 'bad') }}">{{ state }}</b></span>
+      {% endfor %}
+    </div>
+    <a class="btn" href="/users/new">Add a person</a>
+  </div>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">People</h2>
+  {% if not people %}
+    <p class="muted">Nobody added yet. Start with "Add a person".</p>
+  {% else %}
+  <table>
+    <tr><th>User</th><th>Status</th><th>Linux</th><th>LiteLLM</th><th>Portainer</th><th>Turnstone</th><th class="hide-sm">Updated</th><th></th></tr>
+    {% for p in people %}
+    <tr>
+      <td><b>{{ p.username }}</b><br><span class="muted">{{ p.display_name }}{% if p.email %} · {{ p.email }}{% endif %}</span></td>
+      <td class="{{ 'ok' if p.status == 'active' else 'muted' }}">{{ p.status }}</td>
+      {% for s in [p.linux, p.litellm, p.portainer, p.turnstone] %}
+        <td class="{{ 'ok' if s in ('ok', 'removed') else ('muted' if s and s.startswith('skipped') else 'bad') }}" title="{{ s }}">
+          {{ s if s in ('ok', 'removed') or (s and s.startswith('skipped')) else 'failed' }}</td>
+      {% endfor %}
+      <td class="hide-sm muted">{{ p.updated_at }}</td>
+      <td>
+        {% if p.status == 'active' %}
+        <form method="post" action="/users/{{ p.username }}/offboard" class="row">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input name="confirm" placeholder="type {{ p.username }}" style="width:130px">
+          <button class="danger" type="submit">Offboard</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p class="hint">Hover a "failed" cell to see why. Offboarding asks you to type the username.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">Recent activity</h2>
+  <table>
+    <tr><th>When (UTC)</th><th>Who</th><th>Action</th><th>User</th><th>Detail</th></tr>
+    {% for a in audit %}
+    <tr><td class="muted">{{ a.at }}</td><td>{{ a.actor }}</td><td>{{ a.action }}</td><td>{{ a.username }}</td>
+        <td class="{{ 'bad' if 'FAILED' in a.detail else '' }}">{{ a.detail }}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,20 @@
+[Unit]
+Description=Spark access manager (Linux, LiteLLM, Portainer, Turnstone users)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+User=spark-access
+Group=spark-access
+WorkingDirectory=/opt/spark-access
+EnvironmentFile=/etc/spark-access/env
+# 127.0.0.1 only: reach it with an SSH tunnel or from the Spark itself.
+ExecStart=/opt/spark-access/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8099 --proxy-headers
+Restart=on-failure
+RestartSec=5
+# No ProtectSystem/ProtectHome here: the sudo'd scripts inherit this unit's mount
+# namespace and must be able to write /etc/passwd and /home.
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card" style="max-width:760px">
+  <h2 style="margin-top:0">{{ action }} {{ username }}</h2>
+  <table>
+    {% for r in results %}
+    <tr><td><b>{{ r.system }}</b></td>
+        <td class="{{ 'ok' if r.ok else 'bad' }}">{{ 'done' if r.ok else 'failed' }}</td>
+        <td>{{ r.message }}</td></tr>
+    {% endfor %}
+  </table>
+
+  {% if secrets %}
+  <h3>Credentials, shown only once</h3>
+  <p class="warn">Copy these into your password manager and share them with {{ username }} from there.
+     They are not stored here and can't be shown again.</p>
+  {% for name, value in secrets.items() %}
+    <label>{{ name }}</label><div class="secret">{{ value }}</div>
+  {% endfor %}
+  <h3>What to send {{ username }}</h3>
+  <ul>
+    <li>SSH: <code>ssh {{ username }}@spark</code></li>
+    <li>LiteLLM base URL: office <code>{{ cfg.OFFICE_BASE_URL }}</code>, Tailscale <code>{{ cfg.TAILSCALE_BASE_URL }}</code></li>
+    <li>Turnstone: <code>{{ cfg.TURNSTONE_PUBLIC_URL }}</code> (change the password after first sign-in)</li>
+    <li>Portainer: <code>{{ cfg.PORTAINER_PUBLIC_URL }}</code></li>
+  </ul>
+  {% endif %}
+
+  {% if results | selectattr('ok', 'equalto', false) | list %}
+  <p class="bad">Something failed. Fix the cause (hover shows it on the dashboard), then
+  {% if action == 'Onboarded' %}offboard and add the person again, or finish that system by hand.{% else %}finish that system by hand.{% endif %}</p>
+  {% endif %}
+  <p><a href="/">Back to the dashboard</a></p>
+</div>
+{% endblock %}
