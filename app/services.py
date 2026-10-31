@@ -245,6 +245,8 @@ def health() -> dict[str, str]:
             f"{config.PORTAINER_URL}/api/system/status", timeout=3, verify=config.PORTAINER_VERIFY_TLS)),
         ("Turnstone", config.TURNSTONE_ADMIN_TOKEN, lambda: httpx.get(
             f"{config.TURNSTONE_URL}/health", timeout=3, verify=config.TURNSTONE_VERIFY_TLS)),
+        ("JupyterHub", config.JUPYTERHUB_USERS_FILE, lambda: httpx.get(
+            f"{config.JUPYTERHUB_URL}/hub/api/", timeout=3)),
     ]
     for name, configured, call in checks:
         if not configured:
@@ -255,3 +257,115 @@ def health() -> dict[str, str]:
         except Exception:  # noqa: BLE001
             status[name] = "down"
     return status
+
+
+# ---------------------------------------------------------------- JupyterHub ---
+# The hub reads JUPYTERHUB_USERS_FILE on every sign-in and notebook start, so writing the
+# file is what grants access and sets limits. The API is only used to take access away.
+
+def jupyterhub_enabled() -> bool:
+    return bool(config.JUPYTERHUB_USERS_FILE)
+
+
+def jupyterhub_new_password() -> tuple[str, str]:
+    from .security import hash_password
+    password = _password()
+    return password, hash_password(password)
+
+
+def jupyterhub_sync() -> Result:
+    """Rewrite the users file from the database (atomically, readable only by its owner)."""
+    if not jupyterhub_enabled():
+        return Result("JupyterHub", True, "skipped (no JUPYTERHUB_USERS_FILE)")
+    import json
+    import os
+    from . import db
+
+    users = {}
+    if config.JUPYTERHUB_ADMIN and config.ADMIN_PASSWORD_HASH:
+        users[config.JUPYTERHUB_ADMIN] = {
+            "password": config.ADMIN_PASSWORD_HASH, "admin": True,
+            "cpu": config.JUPYTERHUB_DEFAULT_CPU, "mem": f"{config.JUPYTERHUB_DEFAULT_MEM_GB}G",
+        }
+    for p in db.jupyterhub_people():
+        if p["username"] == config.JUPYTERHUB_ADMIN:
+            continue
+        users[p["username"]] = {
+            "password": p["jh_password_hash"], "admin": False,
+            "cpu": p["jh_cpu"] or config.JUPYTERHUB_DEFAULT_CPU,
+            "mem": f"{p['jh_mem_gb'] or config.JUPYTERHUB_DEFAULT_MEM_GB}G",
+        }
+    path = config.JUPYTERHUB_USERS_FILE
+    tmp = f"{path}.tmp"
+    try:
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
+            json.dump({"version": 1, "users": users}, f, indent=2, sort_keys=True)
+        os.replace(tmp, path)   # the hub mounts the folder, so it sees the new file at once
+    except OSError as exc:
+        return _err("JupyterHub", exc)
+    return Result("JupyterHub", True, f"users file updated ({len(users)} accounts)")
+
+
+def _jupyterhub() -> httpx.Client:
+    return httpx.Client(
+        base_url=f"{config.JUPYTERHUB_URL}/hub/api", timeout=30,
+        headers={"Authorization": f"token {config.JUPYTERHUB_API_TOKEN}"},
+    )
+
+
+def jupyterhub_running(username: str) -> bool | None:
+    """True/False if the hub answers, None if it can't be asked."""
+    if not config.JUPYTERHUB_API_TOKEN:
+        return None
+    try:
+        with _jupyterhub() as c:
+            r = c.get(f"/users/{username}")
+            if r.status_code == 404:
+                return False
+            r.raise_for_status()
+            return bool(r.json().get("server"))
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def jupyterhub_stop_server(username: str) -> Result:
+    if not config.JUPYTERHUB_API_TOKEN:
+        return Result("JupyterHub", False, "no JUPYTERHUB_API_TOKEN: stop it on the hub's Admin page")
+    try:
+        with _jupyterhub() as c:
+            r = c.delete(f"/users/{username}/server")
+            if r.status_code not in (202, 204, 400, 404):   # 400/404: not running / no such user
+                r.raise_for_status()
+    except Exception as exc:  # noqa: BLE001
+        return _err("JupyterHub", exc)
+    return Result("JupyterHub", True, "notebook stopped (if it was running)")
+
+
+def jupyterhub_remove(username: str) -> Result:
+    """Stop their notebook and delete them from the hub, which also ends their sessions.
+    Their files stay in the Docker volume jupyterhub-user-<username>."""
+    if not config.JUPYTERHUB_API_TOKEN:
+        return Result("JupyterHub", True,
+                      "removed from the users file; no JUPYTERHUB_API_TOKEN, so an open session "
+                      "lasts until it expires (delete them on the hub's Admin page)")
+    stop = jupyterhub_stop_server(username)
+    if not stop.ok:
+        return stop
+    try:
+        import time
+        with _jupyterhub() as c:
+            for _ in range(30):                           # wait for the stop to finish
+                r = c.get(f"/users/{username}")
+                if r.status_code == 404:
+                    return Result("JupyterHub", True, "not on the hub (nothing to delete)")
+                r.raise_for_status()
+                if not r.json().get("server") and not r.json().get("pending"):
+                    break
+                time.sleep(1)
+            r = c.delete(f"/users/{username}")
+            if r.status_code not in (204, 404):
+                r.raise_for_status()
+    except Exception as exc:  # noqa: BLE001
+        return _err("JupyterHub", exc)
+    return Result("JupyterHub", True, "notebook stopped and user deleted (files kept in their volume)")

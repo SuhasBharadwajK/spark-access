@@ -19,6 +19,11 @@ CREATE TABLE IF NOT EXISTS people (
     portainer_id  INTEGER,
     turnstone     TEXT,
     turnstone_id  TEXT,
+    jupyterhub    TEXT,                   -- ok | removed | error text | skipped | NULL (no access)
+    jh_enabled    INTEGER NOT NULL DEFAULT 0,
+    jh_cpu        REAL,
+    jh_mem_gb     INTEGER,
+    jh_password_hash TEXT,
     created_at    TEXT NOT NULL,
     updated_at    TEXT NOT NULL
 );
@@ -48,9 +53,31 @@ def connect():
         conn.close()
 
 
+# Columns added after the first release; init() adds any that an older database lacks.
+_ADDED_COLUMNS = {
+    "jupyterhub": "TEXT",
+    "jh_enabled": "INTEGER NOT NULL DEFAULT 0",
+    "jh_cpu": "REAL",
+    "jh_mem_gb": "INTEGER",
+    "jh_password_hash": "TEXT",
+}
+
+
 def init() -> None:
     with connect() as conn:
         conn.executescript(SCHEMA)
+        have = {r["name"] for r in conn.execute("PRAGMA table_info(people)")}
+        for col, decl in _ADDED_COLUMNS.items():
+            if col not in have:
+                conn.execute(f"ALTER TABLE people ADD COLUMN {col} {decl}")
+
+
+def jupyterhub_people() -> list[sqlite3.Row]:
+    with connect() as conn:
+        return conn.execute(
+            "SELECT * FROM people WHERE status = 'active' AND jh_enabled = 1 "
+            "AND jh_password_hash IS NOT NULL ORDER BY username"
+        ).fetchall()
 
 
 def list_people() -> list[sqlite3.Row]:

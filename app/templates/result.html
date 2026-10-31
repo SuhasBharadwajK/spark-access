@@ -18,12 +18,17 @@
     <label>{{ name }}</label><div class="secret">{{ value }}</div>
   {% endfor %}
   <h3>What to send {{ username }}</h3>
+  {% if action == 'Onboarded' %}
   <ul>
     <li>SSH: <code>ssh {{ username }}@spark</code></li>
     <li>LiteLLM base URL: office <code>{{ cfg.OFFICE_BASE_URL }}</code>, Tailscale <code>{{ cfg.TAILSCALE_BASE_URL }}</code></li>
     <li>Turnstone: <code>{{ cfg.TURNSTONE_PUBLIC_URL }}</code> (change the password after first sign-in)</li>
     <li>Portainer: <code>{{ cfg.PORTAINER_PUBLIC_URL }}</code></li>
+    {% if 'JupyterHub password' in secrets %}<li>JupyterHub: <code>{{ cfg.JUPYTERHUB_PUBLIC_URL }}</code>, username <code>{{ username }}</code></li>{% endif %}
   </ul>
+  {% else %}
+  <ul><li>JupyterHub: <code>{{ cfg.JUPYTERHUB_PUBLIC_URL }}</code>, username <code>{{ username }}</code></li></ul>
+  {% endif %}
   {% endif %}
 
   {% if results | selectattr('ok', 'equalto', false) | list %}

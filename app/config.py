@@ -30,8 +30,20 @@ TURNSTONE_ADMIN_TOKEN = os.environ.get("TURNSTONE_ADMIN_TOKEN", "")
 TURNSTONE_ROLE = os.environ.get("TURNSTONE_ROLE", "builtin-operator")
 TURNSTONE_VERIFY_TLS = _bool("TURNSTONE_VERIFY_TLS", False)  # Caddy's internal cert
 
+# JupyterHub: spark-access writes the users file the hub reads (who may sign in, password hash,
+# CPU and memory), and uses the hub API to stop servers and delete people who lose access.
+JUPYTERHUB_USERS_FILE = os.environ.get("JUPYTERHUB_USERS_FILE", "")   # empty = JupyterHub not managed
+JUPYTERHUB_URL = os.environ.get("JUPYTERHUB_URL", "http://127.0.0.1:8000").rstrip("/")
+JUPYTERHUB_API_TOKEN = os.environ.get("JUPYTERHUB_API_TOKEN", "")
+JUPYTERHUB_ADMIN = os.environ.get("JUPYTERHUB_ADMIN", "spl")         # signs in with the spark-access admin password
+JUPYTERHUB_DEFAULT_CPU = float(os.environ.get("JUPYTERHUB_DEFAULT_CPU", "4"))
+JUPYTERHUB_DEFAULT_MEM_GB = int(os.environ.get("JUPYTERHUB_DEFAULT_MEM_GB", "8"))
+JUPYTERHUB_MAX_CPU = float(os.environ.get("JUPYTERHUB_MAX_CPU", "20"))
+JUPYTERHUB_MAX_MEM_GB = int(os.environ.get("JUPYTERHUB_MAX_MEM_GB", "64"))
+
 # Shown to new users next to their credentials.
 OFFICE_BASE_URL = os.environ.get("OFFICE_BASE_URL", "http://spark:4000/v1")
 TAILSCALE_BASE_URL = os.environ.get("TAILSCALE_BASE_URL", "http://spark:4000/v1")
 TURNSTONE_PUBLIC_URL = os.environ.get("TURNSTONE_PUBLIC_URL", "https://spark")
 PORTAINER_PUBLIC_URL = os.environ.get("PORTAINER_PUBLIC_URL", "https://spark:9443")
+JUPYTERHUB_PUBLIC_URL = os.environ.get("JUPYTERHUB_PUBLIC_URL", "http://spark:8000")

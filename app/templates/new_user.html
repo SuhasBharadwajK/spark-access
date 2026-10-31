@@ -3,7 +3,8 @@
 <div class="card" style="max-width:640px">
   <h2 style="margin-top:0">Add a person</h2>
   <p class="muted">Creates their Linux account and SSH key, a LiteLLM key, a Portainer user in the
-     "{{ cfg.PORTAINER_TEAM }}" team, and a Turnstone user with role {{ cfg.TURNSTONE_ROLE }}.</p>
+     "{{ cfg.PORTAINER_TEAM }}" team, and a Turnstone user with role {{ cfg.TURNSTONE_ROLE }}{% if cfg.JUPYTERHUB_USERS_FILE %}, plus JupyterHub
+     access if ticked{% endif %}.</p>
   {% if error %}<div class="error">{{ error }}</div>{% endif %}
   <form method="post" action="/users">
     <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -18,6 +19,21 @@
     <label for="public_key">SSH public key</label>
     <textarea id="public_key" name="public_key" required placeholder="ssh-ed25519 AAAA... ">{{ form.public_key or '' }}</textarea>
     <div class="hint">From <code>~/.ssh/id_ed25519.pub</code> on their laptop. The comment is replaced with <code>&lt;username&gt;@spl</code>.</div>
+    {% if cfg.JUPYTERHUB_USERS_FILE %}
+    <fieldset style="border:1px solid var(--line);border-radius:8px;margin-top:16px;padding:4px 14px 12px">
+      <legend style="padding:0 6px"><label style="margin:0;font-weight:600">
+        <input type="checkbox" name="jupyterhub" style="width:auto" {% if form.jupyterhub or not form %}checked{% endif %}> JupyterHub</label></legend>
+      <div class="row" style="gap:16px">
+        <div style="flex:1"><label for="jh_cpu">CPU cores</label>
+          <input id="jh_cpu" name="jh_cpu" type="number" step="0.5" min="0.5" max="{{ cfg.JUPYTERHUB_MAX_CPU }}"
+                 value="{{ form.jh_cpu or ('%g' % cfg.JUPYTERHUB_DEFAULT_CPU) }}"></div>
+        <div style="flex:1"><label for="jh_mem_gb">Memory (GB)</label>
+          <input id="jh_mem_gb" name="jh_mem_gb" type="number" step="1" min="1" max="{{ cfg.JUPYTERHUB_MAX_MEM_GB }}"
+                 value="{{ form.jh_mem_gb or cfg.JUPYTERHUB_DEFAULT_MEM_GB }}"></div>
+      </div>
+      <div class="hint">Limits for their notebook container. You can change them later from the dashboard.</div>
+    </fieldset>
+    {% endif %}
     <p><button type="submit">Create access</button> <a href="/" style="margin-left:10px">Cancel</a></p>
   </form>
 </div>

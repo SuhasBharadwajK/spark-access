@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card" style="max-width:640px">
+  <h2 style="margin-top:0">JupyterHub access for {{ person.username }}</h2>
+  <p class="muted">{{ person.display_name }}{% if person.email %} · {{ person.email }}{% endif %}</p>
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  {% if running %}
+    <p class="warn">Their notebook is running. New limits apply the next time it starts.</p>
+  {% endif %}
+  <form method="post" action="/users/{{ person.username }}/edit">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label><input type="checkbox" name="jupyterhub" style="width:auto" {% if form.jupyterhub %}checked{% endif %}>
+      Can use JupyterHub</label>
+    <div class="hint">Unticking stops their notebook and removes them from the hub. Their files stay in the
+      Docker volume <code>jupyterhub-user-{{ person.username }}</code>.</div>
+    <div class="row" style="gap:16px">
+      <div style="flex:1"><label for="jh_cpu">CPU cores</label>
+        <input id="jh_cpu" name="jh_cpu" type="number" step="0.5" min="0.5" max="{{ cfg.JUPYTERHUB_MAX_CPU }}" value="{{ form.jh_cpu }}"></div>
+      <div style="flex:1"><label for="jh_mem_gb">Memory (GB)</label>
+        <input id="jh_mem_gb" name="jh_mem_gb" type="number" step="1" min="1" max="{{ cfg.JUPYTERHUB_MAX_MEM_GB }}" value="{{ form.jh_mem_gb }}"></div>
+    </div>
+    {% if person.jh_enabled %}
+    <label style="font-weight:400"><input type="checkbox" name="restart" style="width:auto"> Stop their running notebook now, so the new limits apply when they start it again</label>
+    <label style="font-weight:400"><input type="checkbox" name="reset_password" style="width:auto"> Give them a new JupyterHub password</label>
+    {% endif %}
+    <p><button type="submit">Save</button> <a href="/" style="margin-left:10px">Cancel</a></p>
+  </form>
+</div>
+{% endblock %}

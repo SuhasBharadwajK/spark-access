@@ -19,7 +19,7 @@
     <p class="muted">Nobody added yet. Start with "Add a person".</p>
   {% else %}
   <table>
-    <tr><th>User</th><th>Status</th><th>Linux</th><th>LiteLLM</th><th>Portainer</th><th>Turnstone</th><th class="hide-sm">Updated</th><th></th></tr>
+    <tr><th>User</th><th>Status</th><th>Linux</th><th>LiteLLM</th><th>Portainer</th><th>Turnstone</th>{% if cfg.JUPYTERHUB_USERS_FILE %}<th>JupyterHub</th>{% endif %}<th class="hide-sm">Updated</th><th></th></tr>
     {% for p in people %}
     <tr>
       <td><b>{{ p.username }}</b><br><span class="muted">{{ p.display_name }}{% if p.email %} · {{ p.email }}{% endif %}</span></td>
@@ -28,9 +28,20 @@
         <td class="{{ 'ok' if s in ('ok', 'removed') else ('muted' if s and s.startswith('skipped') else 'bad') }}" title="{{ s }}">
           {{ s if s in ('ok', 'removed') or (s and s.startswith('skipped')) else 'failed' }}</td>
       {% endfor %}
+      {% if cfg.JUPYTERHUB_USERS_FILE %}
+        {% set j = p.jupyterhub %}
+        {% if p.status == 'active' and p.jh_enabled and j == 'ok' %}
+          <td class="ok">{{ '%g' % p.jh_cpu }} CPU<br>{{ p.jh_mem_gb }} GB</td>
+        {% elif not j %}
+          <td class="muted">no access</td>
+        {% else %}
+          <td class="{{ 'ok' if j == 'removed' else 'bad' }}" title="{{ j }}">{{ 'removed' if j == 'removed' else 'failed' }}</td>
+        {% endif %}
+      {% endif %}
       <td class="hide-sm muted">{{ p.updated_at }}</td>
       <td>
         {% if p.status == 'active' %}
+        {% if cfg.JUPYTERHUB_USERS_FILE %}<a href="/users/{{ p.username }}/edit" style="font-size:13px">JupyterHub access</a>{% endif %}
         <form method="post" action="/users/{{ p.username }}/offboard" class="row">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <input name="confirm" placeholder="type {{ p.username }}" style="width:130px">

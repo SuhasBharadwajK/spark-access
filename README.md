@@ -1,6 +1,6 @@
 # Spark access manager
 
-One admin page on the DGX Spark that adds or removes a teammate across all four systems at once:
+One admin page on the DGX Spark that adds or removes a teammate across all five systems at once:
 
 | System | On "Add a person" | On "Offboard" |
 | --- | --- | --- |
@@ -8,8 +8,12 @@ One admin page on the DGX Spark that adds or removes a teammate across all four 
 | LiteLLM | Personal key named `<username>`, user ID = work email if given | Key revoked |
 | Portainer (CE) | Standard user, added to the `Developers` team | User deleted |
 | Turnstone | User with role `builtin-operator` (users created through the API get no role, and Turnstone refuses logins without one) | User deleted, which also revokes their Turnstone API tokens |
+| JupyterHub (optional, ticked per person) | Can sign in, with the CPU cores and memory you set | Notebook stopped, user deleted on the hub (files stay in their volume) |
 
-New passwords (Portainer, Turnstone) and the LiteLLM key are shown **once** on the result page, never stored.
+Each person's **JupyterHub access** link on the dashboard lets you change their cores and memory later,
+give them a new JupyterHub password, or take JupyterHub away without offboarding them.
+
+New passwords (Portainer, Turnstone, JupyterHub) and the LiteLLM key are shown **once** on the result page, never stored.
 Every action is written to an audit log shown on the dashboard.
 
 ## How it is locked down
@@ -97,6 +101,33 @@ tmux new -s spark-access ./run-local.sh   # Ctrl+B then D to detach; tmux attach
 ```
 
 To update: `git pull`, then restart the tmux session (Ctrl+C, `./run-local.sh`).
+
+## Connecting JupyterHub
+
+spark-access decides who can use JupyterHub: it writes `users.json` (username, password hash, CPU, memory) into
+a folder that the hub reads on every sign-in and notebook start. The hub's admin account (`JUPYTERHUB_ADMIN`,
+default `spl`) signs in with **this app's admin password**.
+
+1. Make the folder before deploying the `jupyterhub` stack, so that `spl` owns it (if Docker creates it, root does):
+   ```bash
+   mkdir -p ~/jupyterhub/access
+   openssl rand -hex 32          # the API token, used in both places below
+   ```
+2. In the `jupyterhub` stack's environment variables: `SPARK_ACCESS_API_TOKEN=<token>`.
+3. In spark-access's `.env`:
+   ```
+   JUPYTERHUB_USERS_FILE=/home/spl/jupyterhub/access/users.json
+   JUPYTERHUB_URL=http://127.0.0.1:8000
+   JUPYTERHUB_API_TOKEN=<token>
+   JUPYTERHUB_PUBLIC_URL=http://tony-spark.local:8000
+   ```
+   Defaults and ceilings for the form: `JUPYTERHUB_DEFAULT_CPU=4`, `JUPYTERHUB_DEFAULT_MEM_GB=8`,
+   `JUPYTERHUB_MAX_CPU=20`, `JUPYTERHUB_MAX_MEM_GB=64`.
+4. Restart spark-access. It writes `users.json` straight away, so you can sign in to the hub as `spl`.
+
+New limits apply when that person's notebook next starts. The edit page can stop a running notebook for you.
+Without the API token, access still follows the file, but an open browser session lasts until it expires and
+you stop servers on the hub's Admin page yourself.
 
 ## One-time Portainer setup (Community Edition)
 
