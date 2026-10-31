@@ -22,11 +22,11 @@ Every action is written to an audit log shown on the dashboard.
 
 ## Install (on the Spark, about 15 minutes)
 
-1. Copy the whole `team-access` folder to the Spark (the installer takes the two scripts from it).
+1. Clone this repository on the Spark (the installer takes the two scripts from `scripts/`).
 2. Run the installer:
    ```bash
-   cd team-access/spark-access
-   sudo ./install.sh
+   cd spark-access
+   sudo ./install.sh                 # or --no-service, then run.sh in tmux
    ```
 3. Create the admin password hash and a session secret:
    ```bash
@@ -58,6 +58,46 @@ Every action is written to an audit log shown on the dashboard.
 
 To update later: copy the new folder over and run `sudo ./install.sh` again. Config and the database are kept.
 
+## Run from a clone, as your own user (no install)
+
+For running it in tmux as `spl` straight from this repository. Everything stays in the clone; the only
+system change is one sudoers line.
+
+```bash
+sudo apt install -y python3-venv jq tmux
+git clone git@github.com:SuhasBharadwajK/spark-access.git ~/spark-access
+cd ~/spark-access
+
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+cp env.example .env && chmod 600 .env
+.venv/bin/python -m app.security          # admin password hash
+openssl rand -hex 32                      # session secret
+nano .env
+```
+
+In `.env`, besides the hash, secret, keys and URLs, set:
+
+```
+SPARK_ACCESS_DB=/home/spl/spark-access/spark-access.db
+SCRIPTS_DIR=/home/spl/spark-access/scripts
+```
+
+Let `spl` run just the two scripts without a password (the app uses `sudo -n`, which never prompts):
+
+```bash
+echo "spl ALL=(root) NOPASSWD: /home/spl/spark-access/scripts/onboard-user.sh *, /home/spl/spark-access/scripts/offboard-user.sh *" \
+  | sudo tee /etc/sudoers.d/spark-access
+sudo chmod 440 /etc/sudoers.d/spark-access && sudo visudo -c
+```
+
+Start it, then open it from your laptop with `ssh -L 8099:127.0.0.1:8099 spl@<spark>` and <http://localhost:8099>:
+
+```bash
+tmux new -s spark-access ./run-local.sh   # Ctrl+B then D to detach; tmux attach -t spark-access to return
+```
+
+To update: `git pull`, then restart the tmux session (Ctrl+C, `./run-local.sh`).
+
 ## One-time Portainer setup (Community Edition)
 
 The app puts everyone in the `Developers` team (created on first use). In CE, a team member sees and controls only
@@ -75,7 +115,7 @@ This is how people get "limited Docker": through Portainer, not the `docker` gro
 | Path | What |
 | --- | --- |
 | `/opt/spark-access/app` | The app (FastAPI + Jinja templates) |
-| `/opt/spark-access/scripts` | Root-owned copies of the onboarding and offboarding scripts |
+| `/opt/spark-access/scripts` | Root-owned copies of `scripts/onboard-user.sh` and `scripts/offboard-user.sh` |
 | `/etc/spark-access/env` | Settings and secrets |
 | `/var/lib/spark-access/spark-access.db` | People and audit log (SQLite); include it in backups |
 | `/etc/sudoers.d/spark-access` | The two-script sudo rule |

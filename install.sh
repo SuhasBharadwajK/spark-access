@@ -2,7 +2,7 @@
 # Install the Spark access manager on the DGX Spark. Run from this folder:
 #   sudo ./install.sh               # installs and enables the systemd service
 #   sudo ./install.sh --no-service  # everything except systemd; start it with run.sh (e.g. in tmux)
-# Expects onboard-user.sh and offboard-user.sh one folder up (team-access/).
+# Takes onboard-user.sh and offboard-user.sh from ./scripts.
 # Safe to re-run: updates the app and scripts, keeps /etc/spark-access/env and the database.
 
 set -euo pipefail
@@ -13,7 +13,7 @@ info() { echo "==> $*"; }
 NO_SERVICE=false
 [[ "${1:-}" == "--no-service" ]] && NO_SERVICE=true
 SRC="$(cd "$(dirname "$0")" && pwd)"
-SCRIPTS_SRC="$SRC/.."
+SCRIPTS_SRC="$SRC/scripts"
 for f in onboard-user.sh offboard-user.sh; do
   [[ -f "$SCRIPTS_SRC/$f" ]] || die "missing $SCRIPTS_SRC/$f"
 done
