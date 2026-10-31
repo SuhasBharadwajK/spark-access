@@ -8,7 +8,7 @@
 #   sudo ./onboard-user.sh priya ./priya_id_ed25519.pub
 #   sudo ./onboard-user.sh priya "ssh-ed25519 AAAAC3Nza... anything"
 #
-# The key's comment is replaced with "<username>@laptop", so authorized_keys
+# The key's comment is replaced with "<username>@spl", so authorized_keys
 # always says whose key it is, whatever the teammate's laptop called it.
 #
 # Optional, to also create the person's LiteLLM key (skipped when unset):
@@ -22,7 +22,7 @@
 set -euo pipefail
 
 GROUP="spark-users"
-KEY_COMMENT_SUFFIX="laptop"
+KEY_COMMENT_SUFFIX="spl"
 
 die()  { echo "ERROR: $*" >&2; exit 1; }
 info() { echo "==> $*"; }

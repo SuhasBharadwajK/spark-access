@@ -52,7 +52,7 @@ def linux_onboard(username: str, public_key: str) -> Result:
     out = (proc.stdout + proc.stderr).strip()
     if proc.returncode != 0:
         return Result("Linux", False, out.splitlines()[-1] if out else f"exit {proc.returncode}")
-    return Result("Linux", True, f"account and SSH key {username}@laptop installed")
+    return Result("Linux", True, f"account and SSH key {username}@spl installed")
 
 
 def linux_offboard(username: str) -> Result:

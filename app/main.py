@@ -16,7 +16,8 @@ USERNAME_RE = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
 KEY_RE = re.compile(r"^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(256|384|521)|sk-ssh-ed25519@openssh\.com) [A-Za-z0-9+/=]+( .*)?$")
 
 if not config.SESSION_SECRET or not config.ADMIN_PASSWORD_HASH:
-    raise SystemExit("Set SESSION_SECRET and ADMIN_PASSWORD_HASH in /etc/spark-access/env")
+    raise SystemExit("SESSION_SECRET or ADMIN_PASSWORD_HASH is empty: set both in the env file "
+                     "(.env for run-local.sh, /etc/spark-access/env for the service)")
 
 app = FastAPI(title="Spark access", docs_url=None, redoc_url=None, openapi_url=None)
 app.add_middleware(SessionMiddleware, secret_key=config.SESSION_SECRET,
@@ -120,7 +121,7 @@ def create_user(request: Request, username: str = Form(...), display_name: str =
     by = {r.system: r for r in results}
     db.upsert_person(
         username=username, display_name=display_name, email=email or None,
-        key_comment=f"{username}@laptop", status="active",
+        key_comment=f"{username}@spl", status="active",
         linux="ok" if by["Linux"].ok else by["Linux"].message,
         litellm="ok" if by["LiteLLM"].ok else by["LiteLLM"].message,
         portainer="ok" if by["Portainer"].ok else by["Portainer"].message,
