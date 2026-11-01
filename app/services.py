@@ -192,12 +192,26 @@ def _turnstone_user_id(c: httpx.Client, username: str) -> str | None:
     return None
 
 
+def _turnstone_role_id(c: httpx.Client) -> str:
+    """TURNSTONE_ROLE may be a role's name (custom roles get a random role_id) or its role_id."""
+    wanted = config.TURNSTONE_ROLE
+    r = c.get("/v1/api/admin/roles")
+    if r.status_code == 403:          # token can't list roles: treat the setting as a role_id
+        return wanted
+    r.raise_for_status()
+    for role in r.json().get("roles", []):
+        if wanted in (role.get("role_id"), role.get("name")):
+            return role["role_id"]
+    raise LookupError(f"Turnstone has no role named '{wanted}' (check TURNSTONE_ROLE)")
+
+
 def turnstone_onboard(username: str, display_name: str) -> Result:
     if not config.TURNSTONE_ADMIN_TOKEN:
         return Result("Turnstone", True, "skipped (no TURNSTONE_ADMIN_TOKEN)")
     try:
         with _turnstone() as c:
             password = _password()
+            role_id = _turnstone_role_id(c)   # before creating, so a bad role name creates nothing
             user_id = _turnstone_user_id(c, username)
             created = user_id is None
             if created:
@@ -208,7 +222,7 @@ def turnstone_onboard(username: str, display_name: str) -> Result:
                 user_id = r.json()["user_id"]
             # Users created through the API have no role, and Turnstone refuses logins
             # with an empty permission set, so a role is required.
-            r = c.post(f"/v1/api/admin/users/{user_id}/roles", json={"role_id": config.TURNSTONE_ROLE})
+            r = c.post(f"/v1/api/admin/users/{user_id}/roles", json={"role_id": role_id})
             if r.status_code not in (200, 201, 409):
                 r.raise_for_status()
     except Exception as exc:  # noqa: BLE001

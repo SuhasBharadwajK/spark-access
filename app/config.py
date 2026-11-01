@@ -27,7 +27,7 @@ PORTAINER_VERIFY_TLS = _bool("PORTAINER_VERIFY_TLS", False)  # Portainer uses a 
 
 TURNSTONE_URL = os.environ.get("TURNSTONE_URL", "https://127.0.0.1:443").rstrip("/")
 TURNSTONE_ADMIN_TOKEN = os.environ.get("TURNSTONE_ADMIN_TOKEN", "")
-TURNSTONE_ROLE = os.environ.get("TURNSTONE_ROLE", "builtin-operator")
+TURNSTONE_ROLE = os.environ.get("TURNSTONE_ROLE", "spl-dev")   # role name (or role_id) given to new users
 TURNSTONE_VERIFY_TLS = _bool("TURNSTONE_VERIFY_TLS", False)  # Caddy's internal cert
 
 # JupyterHub: spark-access writes the users file the hub reads (who may sign in, password hash,
