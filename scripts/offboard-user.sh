@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Offboard a teammate from the DGX Spark: lock the account, cut SSH, stop their
-# processes, archive their home folder, and optionally revoke their LiteLLM key.
+# processes, archive their home folder, remove their Sandbox containers and volumes
+# (names starting with <username>-), and optionally revoke their LiteLLM key.
 #
 # Usage:
 #   sudo ./offboard-user.sh <username> [--delete-home] [--yes]
@@ -83,6 +84,50 @@ if command -v docker >/dev/null; then
   done
 fi
 
+# --- Sandbox (rootless Docker of the 'sandbox' user) ------------------------
+# Everything there named <username>-...: containers, the volumes holding NIM model caches, networks.
+# spark-access deletes their Portainer stacks first; this removes what a stack delete leaves behind
+# (volumes) and any loose containers that follow the naming rule.
+SANDBOX_SUMMARY="none"
+if id sandbox >/dev/null 2>&1; then
+  SB_UID="$(id -u sandbox)"
+  SB_SOCK="/run/user/$SB_UID/docker.sock"
+  if [[ -S "$SB_SOCK" ]]; then
+    sbd() {
+      sudo -u sandbox -H env XDG_RUNTIME_DIR="/run/user/$SB_UID" DOCKER_HOST="unix://$SB_SOCK" \
+        PATH="/usr/bin:/usr/sbin:/bin" docker "$@"
+    }
+    # Other people whose username starts with "<username>-" (e.g. al and al-x): leave theirs alone.
+    OTHERS="$(getent group "$GROUP" | cut -d: -f4 | tr ',' '\n' | grep -E "^$USERNAME-" || true)"
+    mine() {
+      local name="$1" o
+      [[ "$name" == "$USERNAME-"* ]] || return 1
+      for o in $OTHERS; do [[ "$name" == "$o-"* ]] && return 1; done
+      return 0
+    }
+    n_c=0; n_v=0; n_n=0
+    while read -r id name project; do
+      [[ -n "$id" ]] || continue
+      if mine "$name" || mine "${project:-}"; then
+        info "Sandbox: removing container $name"
+        sbd rm -f "$id" >/dev/null && n_c=$((n_c + 1))
+      fi
+    done < <(sbd ps -a --format '{{.ID}} {{.Names}} {{.Label "com.docker.compose.project"}}' 2>/dev/null)
+    while read -r vol; do
+      [[ -n "$vol" ]] && mine "$vol" || continue
+      info "Sandbox: removing volume $vol"
+      sbd volume rm "$vol" >/dev/null && n_v=$((n_v + 1))
+    done < <(sbd volume ls -q 2>/dev/null)
+    while read -r net; do
+      [[ -n "$net" ]] && mine "$net" || continue
+      sbd network rm "$net" >/dev/null 2>&1 && n_n=$((n_n + 1))
+    done < <(sbd network ls --format '{{.Name}}' 2>/dev/null)
+    SANDBOX_SUMMARY="$n_c containers, $n_v volumes, $n_n networks"
+  else
+    info "Sandbox daemon not running, skipping sandbox cleanup"
+  fi
+fi
+
 # --- LiteLLM key (optional) -------------------------------------------------
 if [[ -n "${LITELLM_URL:-}" && -n "${LITELLM_MASTER_KEY:-}" ]]; then
   info "Revoking LiteLLM key with alias '$USERNAME'"
@@ -119,6 +164,7 @@ fi
 cat <<EOF
 
 Done: '$USERNAME' is locked out of SSH, their processes are stopped, home archived to $ARCHIVE.
+Sandbox: removed $SANDBOX_SUMMARY named $USERNAME-*.
 
 Still to do by hand (these are what really cut access):
   1. Entra ID: remove them from 'Spark Team' (closes Grafana, JupyterHub, Open WebUI).

@@ -24,6 +24,7 @@ PORTAINER_URL = os.environ.get("PORTAINER_URL", "https://127.0.0.1:9443").rstrip
 PORTAINER_API_KEY = os.environ.get("PORTAINER_API_KEY", "")
 PORTAINER_TEAM = os.environ.get("PORTAINER_TEAM", "Developers")
 PORTAINER_VERIFY_TLS = _bool("PORTAINER_VERIFY_TLS", False)  # Portainer uses a self-signed cert
+PORTAINER_SANDBOX_ENV = os.environ.get("PORTAINER_SANDBOX_ENV", "Sandbox")  # offboarding deletes <user>-* stacks here
 
 TURNSTONE_URL = os.environ.get("TURNSTONE_URL", "https://127.0.0.1:443").rstrip("/")
 TURNSTONE_ADMIN_TOKEN = os.environ.get("TURNSTONE_ADMIN_TOKEN", "")

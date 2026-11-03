@@ -65,7 +65,9 @@ def linux_offboard(username: str) -> Result:
     out = (proc.stdout + proc.stderr).strip()
     if proc.returncode != 0:
         return Result("Linux", False, out.splitlines()[-1] if out else f"exit {proc.returncode}")
-    return Result("Linux", True, "account locked, SSH key disabled, home archived")
+    sandbox = next((l.split(":", 1)[1].strip() for l in out.splitlines() if l.startswith("Sandbox: removed")), "")
+    msg = "account locked, SSH key disabled, home archived"
+    return Result("Linux", True, f"{msg}; sandbox: {sandbox}" if sandbox else msg)
 
 
 # ------------------------------------------------------------------- LiteLLM ---
@@ -160,18 +162,51 @@ def portainer_onboard(username: str) -> Result:
                   {"Portainer password": password}, user_id)
 
 
+def _portainer_delete_sandbox_stacks(c: httpx.Client, username: str, user_id: int | None) -> list[str]:
+    """Deletes the person's stacks in the Sandbox environment: named <username>-..., or private to them.
+    Portainer runs `compose down` for each; their volumes are removed by offboard-user.sh."""
+    r = c.get("/api/endpoints")
+    r.raise_for_status()
+    sandbox_ids = {e["Id"] for e in r.json() if e.get("Name") == config.PORTAINER_SANDBOX_ENV}
+    if not sandbox_ids:
+        return []
+    r = c.get("/api/users")
+    r.raise_for_status()
+    # Someone else whose name starts with "<username>-" (al and al-x): their stacks aren't ours.
+    others = [u["Username"].lower() for u in r.json()
+              if u.get("Username", "").lower().startswith(f"{username.lower()}-")]
+    r = c.get("/api/stacks")
+    r.raise_for_status()
+    deleted = []
+    for st in r.json():
+        if st.get("EndpointId") not in sandbox_ids:
+            continue
+        name = st.get("Name", "").lower()
+        by_name = name.startswith(f"{username.lower()}-") and not any(name.startswith(f"{o}-") for o in others)
+        rc = st.get("ResourceControl") or {}
+        owners = [a.get("UserId") for a in rc.get("UserAccesses") or []]
+        private_to_them = user_id is not None and owners == [user_id] and not rc.get("TeamAccesses")
+        if by_name or private_to_them:
+            c.delete(f"/api/stacks/{st['Id']}", params={"endpointId": st["EndpointId"]}).raise_for_status()
+            deleted.append(st.get("Name", str(st["Id"])))
+    return deleted
+
+
 def portainer_offboard(username: str) -> Result:
     if not config.PORTAINER_API_KEY:
         return Result("Portainer", True, "skipped (no PORTAINER_API_KEY)")
     try:
         with _portainer() as c:
             user_id = _portainer_user_id(c, username)
-            if user_id is None:
-                return Result("Portainer", True, "no such user (nothing to remove)")
-            c.delete(f"/api/users/{user_id}").raise_for_status()
+            stacks = _portainer_delete_sandbox_stacks(c, username, user_id)
+            if user_id is not None:
+                c.delete(f"/api/users/{user_id}").raise_for_status()
     except Exception as exc:  # noqa: BLE001
         return _err("Portainer", exc)
-    return Result("Portainer", True, "user deleted")
+    removed = f"; Sandbox stacks deleted: {', '.join(stacks)}" if stacks else ""
+    if user_id is None:
+        return Result("Portainer", True, f"no such user{removed}")
+    return Result("Portainer", True, f"user deleted{removed}")
 
 
 # ----------------------------------------------------------------- Turnstone ---

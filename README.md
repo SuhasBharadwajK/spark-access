@@ -4,9 +4,9 @@ One admin page on the DGX Spark that adds or removes a teammate across all five 
 
 | System | On "Add a person" | On "Offboard" |
 | --- | --- | --- |
-| Linux (SSH) | Account in `spark-users`, SSH key installed as `<username>@spl` (runs `onboard-user.sh`) | Account locked and expired, key disabled, processes stopped, home archived (runs `offboard-user.sh`) |
+| Linux (SSH) | Account in `spark-users`, SSH key installed as `<username>@spl` (runs `onboard-user.sh`) | Account locked and expired, key disabled, processes stopped, home archived; in the Sandbox Docker, containers, volumes and networks named `<username>-*` removed (runs `offboard-user.sh`) |
 | LiteLLM | Personal key named `<username>`, user ID = work email if given | Key revoked |
-| Portainer (CE) | Standard user, added to the `Developers` team | User deleted |
+| Portainer (CE) | Standard user, added to the `Developers` team | Their stacks in the Sandbox environment (named `<username>-*`, or private to them) deleted, then the user deleted |
 | Turnstone | User with role `spl-dev` (`TURNSTONE_ROLE`; users created through the API get no role, and Turnstone refuses logins without one) | User deleted, which also revokes their Turnstone API tokens |
 | JupyterHub (optional, ticked per person) | Can sign in, with the CPU cores and memory you set | Notebook stopped, user deleted on the hub (files stay in their volume) |
 
